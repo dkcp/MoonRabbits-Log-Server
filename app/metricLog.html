@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Metric Log</title>
+    </head>
+    <body>
+        <h1>Metric Log</h1>
+        <button onclick="navigateTo('/log/')">홈</button>
+        <br>
+        <label for="metricType">Metric Type:</label>
+        <select name="metricType" id="metricType"></select>
+        <select name="range" id="range"></select>
+        <button id="search">조회</button>
+        <div id="result"></div>
+
+        <script>
+            const metricTypes = [
+                "CPU 사용량",
+                "Memory 사용량",
+                "네트워크 사용량",
+            ];
+
+            const timeRanges = ['1분', '5분', '10분', '30분', '1시간'];
+
+            const selectMetricType = document.getElementById("metricType");
+            const selectRange = document.getElementById("range");
+
+            metricTypes.forEach((metricType) => {
+                const option = document.createElement("option");
+                option.textContent = metricType;
+                switch(metricType){
+                    case 'CPU 사용량': option.value = 'cpuUsage'; break;
+                    case 'Memory 사용량': option.value = 'memoryUsage'; break;
+                    case '네트워크 사용량': option.value = 'networkUsage'; break;
+                    default : break;
+                }
+                selectMetricType.appendChild(option);
+            });
+
+            timeRanges.forEach((timeRange) => {
+                const option = document.createElement("option");
+                option.textContent = timeRange;
+                if(timeRange==='1분')
+                    option.value = 1;
+                switch(timeRange){
+                    case '1분': option.value=1; break;
+                    case '5분': option.value=5; break;
+                    case '10분': option.value=10; break;
+                    case '30분': option.value=30; break;
+                    case '1시간': option.value=60; break;
+                    default : break;
+                }
+                selectRange.appendChild(option);
+            });
+
+            document.getElementById("search").addEventListener("click", async () => {
+                const metricType = selectMetricType.value;
+                const range = selectRange.value;
+
+                const response = await fetch(`/log/metric2/search?metricType=${metricType}&range=${range}`);
+                const result = await response.text();
+                document.getElementById("result").innerHTML = result;
+            });
+            
+            function navigateTo(path) {
+                const currentUrl = window.location.origin;
+                window.location.href = currentUrl + path;
+            };
+        </script>
+    </body>
+</html>
