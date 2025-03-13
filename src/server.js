@@ -4,6 +4,7 @@ import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import redisClient from "./redisClient.js";
+import util from "util";
 
 const app = express();
 const port = 4000;
@@ -48,7 +49,7 @@ app.get("/log/server", (req, res) => {
     const endTime = Date.now();
 
     if (!range) {
-        result += '<br><label>현재 기록하지 않음</label>';
+        result += "<br><label>버튼으로 검색</label>";
         res.status(200).send(result);
         return;
     } else if (range === "1h") {
@@ -67,10 +68,10 @@ app.get("/log/server", (req, res) => {
 
     result += '<table border="1" style="width: 100%; border-collapse: collapse;">';
     result +=
-        '<thead><tr><th style="width: 80px;">날짜</th><th style="width: 80px;">시간</th><th>메시지</th></tr></thead>';
+        '<thead><tr><th style="width: 80px;">날짜</th><th style="width: 80px;">시간</th><th style="width: 160px;">패킷 타입</th><th>메시지</th></tr></thead>';
     result += "<tbody>";
     redisClient
-        .zrangebyscore("serverLogs", startTime, endTime, (err, logs) => {
+        .zrangebyscore("packetLogs", startTime, endTime, (err, logs) => {
             if (err) {
                 console.error("Redis 로그 조회 실패:", err);
                 return res.status(500).send("로그 조회 실패");
@@ -86,7 +87,7 @@ app.get("/log/server", (req, res) => {
                 const seconds = String(date.getSeconds()).padStart(2, "0");
                 const dateStr = `${month}-${day}`;
                 const time = `${hours}:${minutes}:${seconds}`;
-                result += `<tr><td>${dateStr}</td><td>${time}</td><td>${parsedLog.message}</td></tr>\n`;
+                result += `<tr><td>${dateStr}</td><td>${time}</td><td>${parsedLog.packetType}</td><td>${parsedLog.message}</td></tr>\n`;
             });
         })
         .then(() => {
@@ -159,10 +160,12 @@ app.get("/log/packetLog/search", (req, res) => {
     }
 
     let result = "";
+    let resultUp = "";
+    let count = 0;
 
     let startTime = Date.now() - range * 60 * 1000;
     const endTime = Date.now();
-    result = `<h4>${1*range < 60 ? `${range}분간` : `1시간`} ${packetType} 패킷 로그 조회</h4>`;
+    resultUp = `<h4>${1 * range < 60 ? `${range}분간` : `1시간`} ${packetType} 패킷 로그 조회</h4>`;
 
     result += '<table border="1" style="width: 100%; border-collapse: collapse;">';
     result +=
@@ -175,12 +178,11 @@ app.get("/log/packetLog/search", (req, res) => {
                 console.error("Redis 패킷 로그 조회 실패:", err);
                 return res.status(500).send("패킷 로그 조회 실패");
             }
-            console.log('조회 성공', logs);
             logs.forEach((log) => {
                 const parsedLog = JSON.parse(log);
-                console.log(log);
 
                 if (parsedLog.packetType === packetType) {
+                    count++;
                     const date = new Date(parsedLog.time);
                     const month = String(date.getMonth() + 1).padStart(2, "0");
                     const day = String(date.getDate()).padStart(2, "0");
@@ -195,7 +197,8 @@ app.get("/log/packetLog/search", (req, res) => {
         })
         .then(() => {
             result += "</tbody></table>";
-            res.send(result);
+            resultUp += `<label>총 ${count}개</label>`;
+            res.send(resultUp+result);
         });
 });
 
@@ -289,8 +292,7 @@ app.get("/log/metric2/search", (req, res) => {
     result = `<h4>${range < 60 ? `${range}분간` : `1시간`} ${metricType} 조회</h4>`;
 
     result += '<table border="1" style="width: 100%; border-collapse: collapse;">';
-    result +=
-        `<thead><tr><th style="width: 80px;">날짜</th><th style="width: 80px;">시간</th><th>${metricType}</th></tr></thead>`;
+    result += `<thead><tr><th style="width: 80px;">날짜</th><th style="width: 80px;">시간</th><th>${metricType}</th></tr></thead>`;
     result += "<tbody>";
 
     redisClient
@@ -340,7 +342,7 @@ app.get("/log/error", (req, res) => {
     const endTime = Date.now();
 
     if (!range) {
-        result += '<br><label>버튼으로 검색</label>';
+        result += "<br><label>버튼으로 검색</label>";
         res.status(200).send(result);
         return;
     } else if (range === "1h") {
@@ -388,6 +390,41 @@ app.get("/log/error", (req, res) => {
             result += "</tbody></table>";
             res.send(result);
         });
+});
+
+// 세션 페이지
+app.get("/log/playerSession", async (req, res) => {
+    let result = `<h1>Player Session</h1>
+    <button onclick="navigateTo('/log/')">홈</button>
+    <script>
+        function navigateTo(path) {
+            const currentUrl = window.location.origin;
+            window.location.href = currentUrl + path;
+        }
+    </script>`;
+
+    result += '<table border="1" border-collapse: collapse;">';
+    result += `<thead><tr><th style="width: 400px;">PlayerId</th><th style="width: 200px;">닉네임</th><th style="width: 50px;">섹터</th><th style="width: 200px;">로그인 시간</th></tr></thead>`;
+    result += "<tbody>";
+
+    try {
+        const keys = await redisClient.keys("fullSession:*");
+        if (keys.length === 0) {
+            console.log('fullSession으로 시작하는 키가 없습니다.');
+            return;
+        }
+
+        for (const key of keys) {
+            const playerData = await redisClient.hget(key, "player");
+            const data = JSON.parse(playerData);
+            result += `<tr><td>${data.playerId}</td><td>${data.nickname}</td><td>${data.currentSector}</td><td>${data.loginTime}</td></tr>`; // 데이터를 키별로 저장
+        }
+
+        result += "</tbody></table>";
+        res.send(result);
+    } catch (err) {
+        console.error("오류 발생:", err);
+    }
 });
 
 app.listen(port, "0.0.0.0", () => {
