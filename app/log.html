@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoonRabbits Log</title>
+</head>
+<body>
+    <h1>MoonRabbits Log</h1>
+    <button onclick="navigateTo('/log/server')">서버로그</button>
+    <button onclick="navigateTo('/log/packet')">패킷로그</button>
+    <button onclick="navigateTo('/log/metric')">메트릭</button>
+
+    <script>
+        function navigateTo(path) {
+            const currentUrl = window.location.origin;
+            window.location.href = currentUrl + path;
+        }
+    </script>
+</body>
+</html>
